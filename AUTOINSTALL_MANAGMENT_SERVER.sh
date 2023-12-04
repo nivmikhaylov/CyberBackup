@@ -9,8 +9,6 @@ PACKAGES_PYTHON="python-modules-sqlite3 python-module-requests"
 
 LOG="/root/UNIVERSAL_LOG_CYBERPROTECT_INSTALL.log"
 
-R_PATH="/root/REMOTEUPDATE"
-
 log(){
    message="$(date +"%y-%m-%d %T") $@"
    echo $message
@@ -23,15 +21,14 @@ log "############################################"
 log "Running the script.."
 log "############################################"
 
-echo  "" >> $LOG
+echo "" >> $LOG
 
 log "############################################"
 log "Checking who is running the script.."
 log "############################################"
 
-echo  "" >> $LOG
+echo "" >> $LOG
 
-log "############################################"
 if [ "$(id -u)" != "0" ];
 then
    log "This script must be run as root!"
@@ -39,88 +36,128 @@ then
 else
    log "Thist script run as root. Runing next steps..."
 fi
+
+echo "" >> $LOG
+
 log "############################################"
 
-echo  "" >> $LOG
+echo "" >> $LOG
 
 log "############################################"
 log "Pre-Checking Linux System..."
 log "############################################"
 log "Stage 0. Checking OS"
 log "############################################"
-echo  "" >> $LOG
-log "Server:"
+echo "" >> $LOG
+
+log "Server: $(hostname)"
+echo "" >> $LOG
 hostnamectl >> $LOG
-echo  "" >> $LOG
-log "Listing Linux Services:"
+log "Machine ID: $(cat /etc/machine-id)"
+
+echo "" >> $LOG
+
+log "Listing Linux Services..."
 systemctl list-units --type=service --state=running >> $LOG
-echo  "" >> $LOG
-log "NTP:"
-timedatectl status | grep NTP >> $LOG
-echo  "" >> $LOG
-log "Available repository list:"
+
+echo "" >> $LOG
+
+log "$(timedatectl status | grep NTP )"
+echo "" >> $LOG
+timedatectl >> $LOG
+
+echo "" >> $LOG
+
+log "Available repository list..."
 apt-repo list >> $LOG
+
+echo "" >> $LOG
+
 log "############################################"
-echo  "" >> $LOG
+log "Stage 1. Checking file system"
 log "############################################"
-log "Stage 0. Checking file system"
-log "############################################"
-echo  "" >> $LOG
-log "Lists information about all available or the specified block devices:"
+
+echo "" >> $LOG
+
+log "Lists information about all available or the specified block devices..."
 lsblk -l -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT,PARTLABEL,UUID | sort -V >> $LOG
-echo  "" >> $LOG
-log "Partition tables:"
-fdisk -l >> $LOG
-echo  "" >> $LOG
-log "Displays the amount of space available on the file system containing each file name argument:" 
-df -hT >> $LOG
-echo :: >> $LOG
-log "Displays the amount of space available on directory Software:"
-df -hT /var/lib/Acronis /usr/lib/Acronis >> $LOG
-echo "" >> $LOG
-log "Display mount point:"
-grep "Acronis*" /etc/fstab >> $LOG
+
 echo "" >> $LOG
 
-if $(egrep "/var/lib/Acronis|/usr/lib/Acronis" /etc/fstab | grep -q noexec)
+if $(grep -q "Acronis" /etc/fstab)
 then
-        log "Tag noexec found:"
+        log "Mount points found for software installation"
+        findmnt -l | grep Acronis >> $LOG
         echo "" >> $LOG
-        log $(egrep "/var/lib/Acronis|/usr/lib/Acronis" /etc/fstab | grep noexec)
-        exit 1
 else
-        log "Tag noexec not found!"
+        log "Not mount points found for software installation"
+        exit 1
 fi
+
 echo "" >> $LOG
 
+log "Displays the amount of space available on the file system containing each file name argument:" 
+df --output=source,size,used,avail,pcent,target >> $LOG
 
-CURRENT_VERSION="/var/lib/Acronis/UpgradeTool/CURRENT_VERSION.txt"
-LOCAL_VERSION="/var/lib/Acronis/UpgradeTool/LOCAL_VERSION.txt"
+echo "" >> $LOG
 
-if [ "$(sed -n 's/MAJOR_VERSION=//p' $LOCAL_VERSION)" == "$(sed -n 's/MAJOR_VERSION=//p' $CURRENT_VERSION)" ];
+log "Displays the amount of space available on directory Software:"
+
+if [ $(df --output=source,avail,target,pcent -k /usr/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '2' ] && [ $(df --output=source,avail,target,pcent -k /var/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '2' ];
 then
-        log  "The software version has been checked. No update required."
+
+        log "There is free space for software installation"
+        echo "" >> $LOG
+        df --output=source,size,used,avail,pcent,target /var/lib/Acronis /usr/lib/Acronis >> $LOG
 else
-        log  "The software version has been checked. A software update is required."
-
-        if [ "$(sed -n 's/MAJOR_VERSION=//p' $LOCAL_VERSION)" == "$(sed -n 's/MAJOR_VERSION=//p' $CURRENT_VERSION)" ];
-then
-        log  "The software version has been checked. No update required."
-else
-        log  "The software version has been checked. A software update is required."
-
-
-
-        log  "The distribution package is loading."
-
-
-
-        log  "A crontab job is being created to update the software."
-
-        . /etc/os-release
-        OS_NAME=$ID
-        Start=$(date +"%M" --date="+120 seconds")
-        echo "$Start * * * * "$R_PATH/${OS_NAME}-update.sh"" > $R_PATH/crontab_add.txt
-        crontab -l | cat - $R_PATH/crontab_add.txt >$R_PATH/crontab.txt && crontab $R_PATH/crontab.txt
+        log "There is no free space to install software. Check the installation conditions."
+        exit 1
 
 fi
+
+echo "" >> $LOG
+
+log "############################################"
+log  "Stage 3. Checking installed packages on OS"
+log "############################################"
+
+log "$(rpm -qa)"
+echo "" >> $LOG
+
+log "############################################"
+log "Search installed packages on Linux System..."
+log "############################################"
+
+echo "" >> $LOG
+ 
+if [ "$KERNEL_NAME" = "Linux" -a "$HW_NAME" = "x86_64" ]
+then
+        if [ "$(grep -iE "ALT" /etc/*release)" ]
+        then
+                log -e "$KERNEL_NAME"
+                log "$HW_NAME"
+        for PACKAGE_ALT in $PACKAGES_ALT
+        do
+                if ! rpm -qa "$PACKAGE_ALT"
+                then
+                        echo "" >> $LOG
+                        log "Package $PACKAGE_ALT not installed!" >> $PATH_LOG
+                        log "Installation needed packages: $PACKAGE_ALT"
+                        grep "update.altsp.su" /etc/apt/sources.list >/dev/null
+        if [ $? -ne 0 ];
+        then
+                echo -e "$SOURCE" >> /etc/apt/sources.list >> $PATH_LOG
+        else
+                ping $SOURCE_RANDOM_IP
+        fi
+                apt-get install -y "$PACKAGE_ALT" >> $PATH_LOG
+        else
+                log "Package $PACKAGE_ALT installed."
+        fi
+        done
+        fi
+else
+        OS_VERSION=notsupported >> $PATH_LOG
+fi
+
+echo "" >> $LOG
