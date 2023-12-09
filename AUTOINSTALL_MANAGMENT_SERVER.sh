@@ -5,9 +5,9 @@ HW_NAME=$(uname -m)
 HOSTNAME=$(hostname)
 
 PACKAGES_ALT="gcc make kernel-source-5.10 kernel-headers-modules-std-def"
-PACKAGES_PYTHON="python-modules-sqlite3 python-module-requests"
+PACKAGES_PYTHON="libsqllite3 python-modules-sqlite3 python-module-requests"
 
-LOG="/root/UNIVERSAL_LOG_CYBERPROTECT_INSTALL.log"
+LOG="/home/SOFTWARE/UNIVERSAL_LOG_CYBERPROTECT_INSTALL.log"
 
 log(){
    message="$(date +"%y-%m-%d %T") $@"
@@ -103,7 +103,7 @@ echo "" >> $LOG
 
 log "Displays the amount of space available on directory Software:"
 
-if [ $(df --output=source,avail,target,pcent -k /usr/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '2' ] && [ $(df --output=source,avail,target,pcent -k /var/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '2' ];
+if [ $(df --output=source,avail,target,pcent -k /usr/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '25' ] && [ $(df --output=source,avail,target,pcent -k /var/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '25' ];
 then
 
         log "There is free space for software installation"
@@ -121,7 +121,6 @@ log "############################################"
 log  "Stage 3. Checking installed packages on OS"
 log "############################################"
 
-log "$(rpm -qa)"
 echo "" >> $LOG
 
 log "############################################"
@@ -129,28 +128,18 @@ log "Search installed packages on Linux System..."
 log "############################################"
 
 echo "" >> $LOG
- 
+
 if [ "$KERNEL_NAME" = "Linux" -a "$HW_NAME" = "x86_64" ]
 then
         if [ "$(grep -iE "ALT" /etc/*release)" ]
         then
-                log -e "$KERNEL_NAME"
-                log "$HW_NAME"
-        for PACKAGE_ALT in $PACKAGES_ALT
-        do
-                if ! rpm -qa "$PACKAGE_ALT"
-                then
-                        echo "" >> $LOG
-                        log "Package $PACKAGE_ALT not installed!" >> $PATH_LOG
-                        log "Installation needed packages: $PACKAGE_ALT"
-                        grep "update.altsp.su" /etc/apt/sources.list >/dev/null
-        if [ $? -ne 0 ];
-        then
-                echo -e "$SOURCE" >> /etc/apt/sources.list >> $PATH_LOG
-        else
-                ping $SOURCE_RANDOM_IP
-        fi
-                apt-get install -y "$PACKAGE_ALT" >> $PATH_LOG
+                for PACKAGE_ALT in $PACKAGES_ALT
+                do
+                        if ! rpm -qa "$PACKAGE_ALT"
+                        then
+                                echo "" >> $LOG
+                                log "Package $PACKAGE_ALT not installed!" >> $PATH_LOG
+                                log "Installation needed packages: $PACKAGE_ALT"
         else
                 log "Package $PACKAGE_ALT installed."
         fi
@@ -158,6 +147,62 @@ then
         fi
 else
         OS_VERSION=notsupported >> $PATH_LOG
+fi
+
+echo "" >> $LOG
+
+log "############################################"
+log "Search installed Python and SQLITE packages on Linux System..."
+log "############################################"
+
+echo "" >> $LOG
+
+for PACKAGE_PYTHON in $PACKAGES_PYTHON
+do
+        if ! rpm -qa "$PACKAGE_PYTHON"
+        then
+                echo "" >> $LOG
+                log "Package $PACKAGE_PYTHON not installed!" >> $PATH_LOG
+                log "Installation needed packages: $PACKAGE_PYTHON"
+        else
+                log log "Package $PACKAGE_PYTHON installed."
+        fi
+done
+
+echo "" >> $LOG
+
+log "############################################"
+log  "Stage 4. Install Software"
+log "############################################"
+
+echo "" >> $LOG
+ 
+if $(hostname | grep -qi 'bms');
+then
+        log "############################################"
+        log "This server is a Management Server"
+        log "############################################"
+        
+        echo "" >> $LOG
+        
+        log "############################################"
+        log "Search Software CyberBackup in Linux System..."
+        log "############################################"
+ 
+        echo "" >> $LOG
+
+        if ! systemctl list-units --type=service --state=loaded | grep -i "Acronis Service Manager";
+        then
+                log "Management Server not installed."
+                log "Installation Management Server..."
+                sh /home/SOFTWARE/CyberBackup_16_64-bit.x86_64 -a -i AcronisCentralizedManagementServer,BackupAndRecoveryAgent,BackupAndRecoveryBootableComponents
+                log "Management Server installed."
+                systemctl list-units --type=service --state=loaded | grep -i acronis >> $LOG
+        else
+                log "Management Server installed."
+                systemctl list-units --type=service --state=loaded | grep -i acronis >> $LOG
+                log "############################################"
+        fi
 fi
 
 echo "" >> $LOG

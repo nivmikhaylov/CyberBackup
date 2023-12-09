@@ -1,4 +1,21 @@
 #0. Подготовка ВМ
+
+# apt-get update
+# apt-get dist-upgarde
+# update-kernel
+# reboot
+
+# remove-old-kernels
+# apt-get autoremove
+# apt-get clean
+
+#systemctl mask suspend.target
+#systemctl mask hibernate.target
+
+# apt-get autoremove
+# apt-get clean
+# init 0
+
 #0.1. Смена Machine-ID ВМ:
 rm -f /etc/machine-id
 dbus-uuidgen --ensure=/etc/machine-id
