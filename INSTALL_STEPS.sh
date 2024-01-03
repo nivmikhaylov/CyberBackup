@@ -12,10 +12,6 @@
 #systemctl mask suspend.target
 #systemctl mask hibernate.target
 
-# apt-get autoremove
-# apt-get clean
-# init 0
-
 #0.1. Смена Machine-ID ВМ:
 rm -f /etc/machine-id
 dbus-uuidgen --ensure=/etc/machine-id
@@ -101,7 +97,7 @@ sh CyberBackup_16_64-bit.x86_64 -a --ams={IP/FQDN} --id=BackupAndRecoveryAgent,S
 
 #2.3.4. Agent:
 sh CyberBackup_15_64-bit.x86_64 -a --ams={IP/FQDN} --id=BackupAndRecoveryAgent,BackupAndRecoveryBootableComponents
-sh CyberBackup_16_64-bit.x86_64 -a --ams={IP/FQDN}--id=BackupAndRecoveryAgent,BackupAndRecoveryBootableComponents
+sh CyberBackup_16_64-bit.x86_64 -a --ams={IP/FQDN} --id=BackupAndRecoveryAgent,BackupAndRecoveryBootableComponents
 
 #2.3.5. Удаление ПО 
 /usr/lib/Acronis/BackupAndRecovery/uninstall/uninstall

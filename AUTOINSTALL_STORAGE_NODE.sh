@@ -7,10 +7,7 @@ HOSTNAME=$(hostname)
 PACKAGES_ALT="gcc make kernel-source-5.10 kernel-headers-modules-std-def"
 PACKAGES_PYTHON="libsqllite3 python-modules-sqlite3 python-module-requests"
 
-MONSCRIPT="/home/CYBERPROTECT/SCRIPTS/RT-DC_CYBERPROTECT_VAULT_STAT.py"
-LOG="/home/CYBERPROTECT/LOGS/AMS_UNIVERSAL_LOG_CYBERPROTECT_INSTALL.log"
-
-USER="monitoring"
+LOG="/home/CYBERPROTECT/LOGS/ASN_UNIVERSAL_LOG_CYBERPROTECT_INSTALL.log"
 
 log(){
         message="$(date +"%y-%m-%d %T") $@"
@@ -59,15 +56,15 @@ log "Server: $(hostname)"
 
 echo "" >> $LOG
 
-if $(hostname | grep -qi 'bms');
+if $(hostname | grep -qi 'bsn');
 then
         log "############################################"
-        log "This server is a Management Server!"
+        log "This server is a Storage Node!"
         log "############################################"
 elif $(hostname | grep -qi 'bsn');
 then
         log "############################################"
-        log "This server is a Storage Node!"
+        log "This server is a Management Server!"
         log "############################################"
         exit 1       
 else
@@ -76,7 +73,7 @@ else
         log "Script execution has stopped."
         log "############################################"
         exit 1
-fi 
+fi
 
 echo "" >> $LOG
 
@@ -139,7 +136,6 @@ echo "" >> $LOG
 if $(grep -q "Acronis" /etc/fstab)
 then
         log "Mount points found for software installation"
-        echo "" >> $LOG
         findmnt -l | grep Acronis >> $LOG
         echo "" >> $LOG
 else
@@ -152,15 +148,12 @@ fi
 
 echo "" >> $LOG
 
-log "Displays the amount of space available on the file system containing each file name argument:"
-
-echo "" >> $LOG
-
+log "Displays the amount of space available on the file system containing each file name argument:" 
 df --output=source,size,used,avail,pcent,target >> $LOG
 
 echo "" >> $LOG
 
-log "Displays the amount of space available on directory Software..."
+log "Displays the amount of space available on directory Software:"
 
 if [ $(df --output=source,avail,target,pcent -k /usr/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '25' ] && [ $(df --output=source,avail,target,pcent -k /var/lib/Acronis/ | grep Acronis | awk '{print $4}' | sed "s/%//") -le '25' ];
 then
@@ -174,6 +167,37 @@ else
         log "Script execution has stopped."
         log "############################################"
         exit 1
+fi
+
+log "Displays the amount of space available on backup directory:"
+
+if [ $(df --output=source,avail,target,pcent -k /backup_storage | grep backup | awk '{print $4}' | sed "s/%//") -le '25' ];
+then
+
+        log "There is free space on backup directory"
+        echo "" >> $LOG
+        df --output=source,size,used,avail,pcent,target /backup_storage >> $LOG
+else
+        log "The backup directory contains files. Be careful!"
+        log "You need to check the directory based on the script's output."
+fi
+
+echo "" >> $LOG
+
+log "Search tag 'noexec' on directory /var/lib/Acronis, /usr/lib/Acronis and /backup_storage"
+
+if $(mount | egrep "Acronis|backup" | grep -qi noexec);
+then
+        log "Tag noexec found:"
+        log "$(mount | egrep "Acronis|backup")"
+        echo "" >> $LOG
+        log $(mount)
+        log "Script execution has stopped."
+        log "############################################"
+        exit 1
+else
+        log "Tag noexec not found!"
+        log "$(mount | egrep "Acronis|backup")" 
 fi
 
 echo "" >> $LOG
@@ -249,7 +273,7 @@ log "############################################"
 
 echo "" >> $LOG
  
-if $(hostname | grep -qi 'bms');
+if $(hostname | grep -qi 'bsn');
 then    
         log "############################################"
         log "Search Software CyberBackup in Linux System..."
@@ -257,25 +281,25 @@ then
  
         echo "" >> $LOG
 
-        if ! systemctl list-units --type=service --state=loaded | grep -i "Acronis Service Manager";
+        if ! systemctl list-units --type=service --state=loaded | grep -i "Acronis Storage Node";
         then
-                log "Management Server not installed."
+                log "Storage Node not installed."
                 
                 echo "" >> $LOG
                 
-                log "Installation Management Server..."
-                sh /home/CYBERPROTECT/CyberBackup_16_64-bit.x86_64 -a -i AcronisCentralizedManagementServer,BackupAndRecoveryAgent,BackupAndRecoveryBootableComponents
+                log "Installation Storage Node ..."
+                sh /home/CYBERPROTECT/CyberBackup_16_64-bit.x86_64 -a --ams={IP/FQDN} --id=BackupAndRecoveryAgent,StorageServer,BackupAndRecoveryBootableComponents
                 
                 echo "" >> $LOG
                 
-                log "Management Server installed."
+                log "Storage Node installed."
                 
                 echo "" >> $LOG
                 
                 systemctl list-units --type=service --state=loaded | grep -i acronis >> $LOG
                 
         else
-                log "Management Server installed."
+                log "Storage Node installed."
 
                 echo "" >> $LOG
 
@@ -289,77 +313,6 @@ then
                 log "############################################"
         fi
 fi
-
-echo "" >> $LOG
-
-log "############################################"
-log  "Stage 4. Server Tuning"
-log "############################################"
-
-echo "" >> $LOG
-
-log "############################################"
-log "Create an account for the monitoring service."
-log "############################################"
-
-echo "" >> $LOG
-
-useradd -d /dev/null -s /usr/sbin/nologin $USER
-
-log $(grep monitoring /etc/passwd)
-
-log "Set password user - $USER"
-
-echo "" >> $LOG
-
-passwd $USER
-
-log "Password fo user $USER set"
-
-echo "" >> $LOG
-
-log "############################################"
-log "Adding a software monitoring script."
-log "############################################"
-
-echo "" >> $LOG
-
-cp $MONSCRIPT /etc/zabbix/RT-DC_CYBERPROTECT_VAULT_STAT.py
-
-if $(grep -iRLq zabbix_agent2.conf /etc/zabbix/*);
-then
-        touch /etc/zabbix/zabbix_agent2.conf.d/backup.conf
-        echo "UserParameter=cyberbackup.usage,python /etc/zabbix/RT-DC_CYBERPROTECT_VAULT_STAT.py" >> /etc/zabbix/zabbix_agent2.conf.d/backup.conf
-        log "$(cat /etc/zabbix/zabbix_agent2.conf.d/backup.conf)"
-elif $(grep -iRLq zabbix_agentd.conf /etc/zabbix/*);
-then
-        touch /etc/zabbix/zabbix_agentd.conf.d/backup.conf
-        echo "UserParameter=cyberbackup.usage,python /etc/zabbix/RT-DC_CYBERPROTECT_VAULT_STAT.py" >> /etc/zabbix/zabbix_agentd.conf.d/backup.conf
-        log "$(cat /etc/zabbix/zabbix_agentd.conf.d/backup.conf)"
-else
-        log "############################################"
-        log "Zabbix agent not installed."
-        log "Script execution has stopped."
-        log "############################################"
-        exit 1
-fi
-
-echo "" >> $LOG
-
-log "############################################"
-log "Increasing agent session limits"
-log "############################################"
-
-sed -i "s/ulimit -n 1024/ulimit -n 10240/1" /usr/sbin/acronis_asm
-
-echo "" >> $LOG
-
-log "$(grep "ulimit -n" /usr/sbin/acronis_asm)"
-
-echo "" >> $LOG
-
-log "Restart Service - Acronis Service Manager"
-systemctl restart acronis_ams.service && systemctl is-active acronis_ams.service
 
 echo "" >> $LOG
 
